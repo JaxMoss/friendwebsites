@@ -283,16 +283,11 @@ export function NikaAviation() {
     setNotice(type)
   }
 
-  function renderBookingPanel() {
-    return (
-      <Glass
-        id="book"
-        className="rounded-2xl bg-white/8 text-white shadow-[0_22px_70px_rgba(0,0,0,0.2)] ring-1 ring-white/14"
-        preset="hero"
-        radius={22}
-        scale={10}
-      >
-        <div role="tablist" aria-label="Travel tools" className="grid border-b border-white/10 text-xs font-bold uppercase sm:grid-cols-4">
+  function renderBookingPanel(variant: "hero" | "app" = "app") {
+    const isHero = variant === "hero"
+    const bookingPanel = (
+      <>
+        <div role="tablist" aria-label="Travel tools" className="grid border-b border-white/8 text-xs font-bold uppercase sm:grid-cols-4">
           {bookingTabs.map((tab) => (
             <button
               key={tab.key}
@@ -301,7 +296,7 @@ export function NikaAviation() {
               aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex min-h-12 items-center justify-center gap-2 px-4 text-center transition sm:justify-start sm:text-left sm:border-r sm:border-white/8 ${
-                activeTab === tab.key ? "bg-white/12 text-[#f6a915]" : "text-white/78 hover:bg-white/8 hover:text-white"
+                activeTab === tab.key ? "bg-white/[0.09] text-[#f6a915]" : "text-white/78 hover:bg-white/[0.07] hover:text-white"
               }`}
             >
               <tab.icon className="size-4" />
@@ -310,7 +305,7 @@ export function NikaAviation() {
           ))}
         </div>
 
-        <div className="min-h-[218px] p-4">
+        <div className="min-h-[208px] p-4">
           {activeTab === "book" && (
             <div className="grid gap-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -431,6 +426,33 @@ export function NikaAviation() {
             </form>
           )}
         </div>
+      </>
+    )
+
+    if (!isHero) {
+      return (
+        <div id="book" className="overflow-hidden rounded-2xl border border-[#163a72] bg-[#071f4b] text-white shadow-[0_24px_70px_rgba(6,29,79,0.2)]">
+          {bookingPanel}
+        </div>
+      )
+    }
+
+    return (
+      <Glass
+        id="hero-book"
+        className="rounded-[18px] border border-white/24 bg-white/[0.045] text-white shadow-[0_18px_54px_rgba(3,18,44,0.18)]"
+        preset="hero"
+        radius={18}
+        scale={1}
+        blur={14}
+        saturate={1.55}
+        tint={0.045}
+        border={0}
+        glow={0}
+        edge={0}
+        refract={false}
+      >
+        {bookingPanel}
       </Glass>
     )
   }
@@ -764,11 +786,8 @@ export function NikaAviation() {
           </div>
         </header>
 
-        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-8 pt-8 sm:px-8 lg:pb-10">
-          <div className="max-w-[1240px]">
-            {renderBookingPanel()}
-          </div>
-          <div className="mt-14 max-w-3xl lg:mt-20">
+        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-12 pt-12 sm:px-8 lg:pb-16 lg:pt-14">
+          <div className="max-w-3xl">
             <h1 className="text-balance text-5xl font-bold leading-[1.04] tracking-normal sm:text-7xl">
               Your Journey.
               <br />
@@ -779,6 +798,9 @@ export function NikaAviation() {
             <p className="mt-7 max-w-md text-lg leading-8 text-white/86">
               Search flights, manage trips, check in and track the official unofficial airline of Captain Nika.
             </p>
+          </div>
+          <div className="mt-10 max-w-[1180px]">
+            {renderBookingPanel("hero")}
           </div>
         </div>
       </section>
