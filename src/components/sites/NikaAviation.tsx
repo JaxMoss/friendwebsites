@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { AircraftScrollExperience } from "@/components/sites/AircraftScrollExperience"
 
 const navItems = ["Home", "Book", "Manage Booking", "Our Services", "Destinations", "About Us", "Contact Us"]
 
@@ -176,6 +177,8 @@ export function NikaAviation() {
           </div>
         </div>
       </section>
+
+      <AircraftScrollExperience />
 
       <section id="about-us" className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
         <div>
