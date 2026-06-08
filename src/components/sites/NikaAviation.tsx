@@ -440,17 +440,22 @@ export function NikaAviation() {
     return (
       <Glass
         id="hero-book"
-        className="rounded-[18px] border border-white/24 bg-white/[0.045] text-white shadow-[0_18px_54px_rgba(3,18,44,0.18)]"
-        preset="hero"
+        className="rounded-[18px] bg-transparent text-white shadow-[0_26px_90px_rgba(3,18,44,0.34)]"
+        preset="plaque"
         radius={18}
-        scale={1}
-        blur={14}
-        saturate={1.55}
-        tint={0.045}
-        border={0}
-        glow={0}
-        edge={0}
-        refract={false}
+        blur={1.5}
+        saturate={1.42}
+        scale={34}
+        bezel={14}
+        curve={2.8}
+        thickness={0.3}
+        dispersion={0.055}
+        tint={0.055}
+        border={0.18}
+        glow={0.12}
+        edge={0.38}
+        light={305}
+        refract
       >
         {bookingPanel}
       </Glass>

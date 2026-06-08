@@ -10,11 +10,16 @@ type GlassProps = {
   preset?: GlassPresetName
   radius?: number
   scale?: number
+  bezel?: number
+  curve?: number
+  thickness?: number
+  dispersion?: number
   blur?: number
   tint?: number
   border?: number
   glow?: number
   edge?: number
+  light?: number
   saturate?: number
   refract?: boolean
   reveal?: boolean
@@ -27,11 +32,16 @@ export function Glass({
   preset = "hero",
   radius = 28,
   scale,
+  bezel,
+  curve,
+  thickness,
+  dispersion,
   blur,
   tint,
   border,
   glow,
   edge,
+  light,
   saturate,
   refract,
   reveal = false,
@@ -42,12 +52,17 @@ export function Glass({
         preset={preset}
         radius={radius}
         scale={scale}
+        bezel={bezel}
+        curve={curve}
+        thickness={thickness}
+        dispersion={dispersion}
         blur={blur}
         saturate={saturate}
         tint={tint}
         border={border}
         glow={glow}
         edge={edge}
+        light={light}
         refract={refract}
         reveal={reveal}
       />
