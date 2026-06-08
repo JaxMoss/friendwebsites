@@ -22,7 +22,7 @@ type LiveFlight = {
 }
 
 type LiveFlightResponse = {
-  source: "opensky" | "demo"
+  source: "airplanes_live" | "opensky" | "demo"
   sourceLabel: string
   updatedAt: string
   flights: LiveFlight[]
@@ -98,30 +98,16 @@ function makeTrackArc(flight: LiveFlight): TrackArc {
 
 function makeAircraftObject() {
   const group = new THREE.Group()
-  const gold = new THREE.MeshStandardMaterial({
-    color: "#f6b21a",
-    emissive: "#c67800",
-    emissiveIntensity: 0.32,
-    metalness: 0.35,
-    roughness: 0.28,
-  })
-  const white = new THREE.MeshStandardMaterial({
-    color: "#f8fbff",
-    emissive: "#8dbdff",
-    emissiveIntensity: 0.12,
-    metalness: 0.18,
-    roughness: 0.34,
-  })
 
-  const body = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.096, 4), white)
+  const body = new THREE.Mesh(aircraftBodyGeometry, aircraftWhiteMaterial)
   body.rotation.x = Math.PI / 2
   group.add(body)
 
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.008, 0.014), gold)
+  const wing = new THREE.Mesh(aircraftWingGeometry, aircraftGoldMaterial)
   wing.position.z = -0.008
   group.add(wing)
 
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.007, 0.012), gold)
+  const tail = new THREE.Mesh(aircraftTailGeometry, aircraftGoldMaterial)
   tail.position.z = -0.042
   tail.rotation.y = 0.42
   group.add(tail)
@@ -129,6 +115,31 @@ function makeAircraftObject() {
   group.scale.setScalar(1.8)
   return group
 }
+
+const aircraftBodyGeometry = new THREE.ConeGeometry(0.018, 0.096, 4)
+const aircraftWingGeometry = new THREE.BoxGeometry(0.086, 0.008, 0.014)
+const aircraftTailGeometry = new THREE.BoxGeometry(0.044, 0.007, 0.012)
+const aircraftGoldMaterial = new THREE.MeshStandardMaterial({
+  color: "#f6b21a",
+  emissive: "#c67800",
+  emissiveIntensity: 0.32,
+  metalness: 0.35,
+  roughness: 0.28,
+})
+const aircraftWhiteMaterial = new THREE.MeshStandardMaterial({
+  color: "#f8fbff",
+  emissive: "#8dbdff",
+  emissiveIntensity: 0.12,
+  metalness: 0.18,
+  roughness: 0.34,
+})
+const sharedAircraftResources = new Set<THREE.BufferGeometry | THREE.Material>([
+  aircraftBodyGeometry,
+  aircraftWingGeometry,
+  aircraftTailGeometry,
+  aircraftGoldMaterial,
+  aircraftWhiteMaterial,
+])
 
 function MetricSkeleton() {
   return (
@@ -166,8 +177,8 @@ export function LiveFlightGlobe() {
   const [isLoading, setIsLoading] = useState(true)
 
   const isInitialLoading = isLoading && flights.length === 0
-  const visibleFlights = useMemo(() => flights.slice(0, 420), [flights])
-  const trackArcs = useMemo(() => visibleFlights.slice(0, 180).map(makeTrackArc), [visibleFlights])
+  const visibleFlights = useMemo(() => flights.slice(0, 240), [flights])
+  const trackArcs = useMemo(() => visibleFlights.slice(0, 90).map(makeTrackArc), [visibleFlights])
   const featuredFlights = flights.slice(0, 10)
 
   async function loadFlights() {
@@ -205,7 +216,7 @@ export function LiveFlightGlobe() {
     camera.position.set(0, 0.32, 355)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2))
     renderer.setClearColor(0x000000, 0)
     mount.appendChild(renderer.domElement)
 
@@ -256,7 +267,7 @@ export function LiveFlightGlobe() {
     globeRef.current = globe
 
     const starsGeometry = new THREE.BufferGeometry()
-    const starPositions = new Float32Array(900)
+    const starPositions = new Float32Array(360)
     for (let index = 0; index < starPositions.length; index += 3) {
       starPositions[index] = (Math.random() - 0.5) * 900
       starPositions[index + 1] = (Math.random() - 0.5) * 560
@@ -278,6 +289,7 @@ export function LiveFlightGlobe() {
     scene.add(rim)
 
     let frame = 0
+    let isVisible = true
     const resize = () => {
       const width = mount.clientWidth
       const height = mount.clientHeight
@@ -289,26 +301,34 @@ export function LiveFlightGlobe() {
 
     const animate = () => {
       frame = requestAnimationFrame(animate)
+      if (!isVisible || document.hidden) return
       globe.rotation.y += 0.00115
       stars.rotation.y -= 0.00026
       renderer.render(scene, camera)
     }
 
     const resizeObserver = new ResizeObserver(resize)
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      isVisible = Boolean(entry?.isIntersecting)
+    }, { threshold: 0.08 })
     resizeObserver.observe(mount)
+    intersectionObserver.observe(mount)
     resize()
     animate()
 
     return () => {
       cancelAnimationFrame(frame)
       resizeObserver.disconnect()
+      intersectionObserver.disconnect()
       globe._destructor()
       scene.traverse((object) => {
         const mesh = object as THREE.Mesh
-        mesh.geometry?.dispose()
+        if (mesh.geometry && !sharedAircraftResources.has(mesh.geometry)) mesh.geometry.dispose()
         const material = mesh.material
-        if (Array.isArray(material)) material.forEach((item) => item.dispose())
-        else material?.dispose()
+        if (Array.isArray(material)) material.forEach((item) => {
+          if (!sharedAircraftResources.has(item)) item.dispose()
+        })
+        else if (material && !sharedAircraftResources.has(material)) material.dispose()
       })
       renderer.dispose()
       renderer.domElement.remove()

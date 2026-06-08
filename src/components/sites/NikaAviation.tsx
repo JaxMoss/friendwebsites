@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type FormEvent, type ReactNode } from "react"
+import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -31,8 +32,15 @@ import {
 import type { LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { AircraftScrollExperience } from "@/components/sites/AircraftScrollExperience"
 import { Glass } from "@/components/sites/Glass"
+
+const AircraftScrollExperience = dynamic(
+  () => import("@/components/sites/AircraftScrollExperience").then((module) => module.AircraftScrollExperience),
+  {
+    ssr: false,
+    loading: () => <div className="h-[100svh] bg-[#061d4f]" />,
+  }
+)
 
 const venmoUrl = "https://venmo.com/Nika_Shabestari?txn=pay&note=Pilot%20education%20fund"
 

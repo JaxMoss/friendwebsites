@@ -70,9 +70,9 @@ export function AircraftScrollExperience() {
     camera.position.set(0, 0.55, 12)
     camera.lookAt(0, 0, 0)
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" })
     renderer.setClearColor(0x000000, 0)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25))
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.domElement.dataset.aviationScene = "true"
     renderer.domElement.dataset.model = "loading"
@@ -134,6 +134,7 @@ export function AircraftScrollExperience() {
     let lastChapter = -1
     let pointerX = 0
     let pointerY = 0
+    let isVisible = true
 
     const resize = () => {
       const width = mount.clientWidth
@@ -169,6 +170,8 @@ export function AircraftScrollExperience() {
 
     const animate = () => {
       frame = requestAnimationFrame(animate)
+      if (!isVisible || document.hidden) return
+
       const p = clamp(scrollProgress)
       const startX = viewWidth * -0.1
       const endX = viewWidth * 0.45
@@ -186,7 +189,11 @@ export function AircraftScrollExperience() {
     }
 
     const resizeObserver = new ResizeObserver(resize)
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      isVisible = Boolean(entry?.isIntersecting)
+    }, { threshold: 0.04 })
     resizeObserver.observe(mount)
+    intersectionObserver.observe(root)
     window.addEventListener("scroll", updateProgress, { passive: true })
     window.addEventListener("pointermove", onPointerMove, { passive: true })
 
@@ -197,6 +204,7 @@ export function AircraftScrollExperience() {
     return () => {
       cancelAnimationFrame(frame)
       resizeObserver.disconnect()
+      intersectionObserver.disconnect()
       window.removeEventListener("scroll", updateProgress)
       window.removeEventListener("pointermove", onPointerMove)
       scene.traverse((object) => {
