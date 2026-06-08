@@ -451,11 +451,12 @@ export function NikaAviation() {
         thickness={0.3}
         dispersion={0.055}
         tint={0.055}
-        border={0.18}
-        glow={0.12}
-        edge={0.38}
+        border={0}
+        glow={0.08}
+        edge={0.14}
         light={305}
         refract
+        uniformBorder
       >
         {bookingPanel}
       </Glass>

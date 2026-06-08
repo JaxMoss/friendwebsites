@@ -23,6 +23,7 @@ type GlassProps = {
   saturate?: number
   refract?: boolean
   reveal?: boolean
+  uniformBorder?: boolean
 }
 
 export function Glass({
@@ -45,6 +46,7 @@ export function Glass({
   saturate,
   refract,
   reveal = false,
+  uniformBorder = false,
 }: GlassProps) {
   return (
     <div id={id} className={`glass-control relative isolate overflow-hidden ${className ?? ""}`}>
@@ -66,6 +68,7 @@ export function Glass({
         refract={refract}
         reveal={reveal}
       />
+      {uniformBorder && <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] border border-white/26 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" />}
       <div className="relative z-10">{children}</div>
     </div>
   )
