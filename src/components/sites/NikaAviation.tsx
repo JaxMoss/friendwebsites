@@ -188,7 +188,7 @@ function SectionHeader({ eyebrow, title, copy }: { eyebrow: string; title: strin
 
 function FieldShell({ label, icon: Icon, children }: { label: string; icon: LucideIcon; children: ReactNode }) {
   return (
-    <label className="rounded-lg border border-white/12 bg-white/10 px-3 py-2.5">
+    <label className="rounded-lg border border-white/12 bg-[#071f4b]/42 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
       <span className="text-[0.62rem] font-bold uppercase tracking-[0.08em] text-white/56">{label}</span>
       <span className="mt-2 flex items-center gap-2">
         <Icon className="size-4 shrink-0 text-[#f6a915]" />
@@ -200,7 +200,7 @@ function FieldShell({ label, icon: Icon, children }: { label: string; icon: Luci
 
 function TextInput({ placeholder, icon: Icon }: { placeholder: string; icon: LucideIcon }) {
   return (
-    <label className="flex h-11 items-center gap-3 rounded-lg border border-white/12 bg-white/10 px-4 text-white">
+    <label className="flex h-11 items-center gap-3 rounded-lg border border-white/12 bg-[#071f4b]/42 px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
       <Icon className="size-4 text-[#f6a915]" />
       <input required placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-white/48 outline-none" />
     </label>
@@ -448,22 +448,24 @@ export function NikaAviation() {
     return (
       <Glass
         id="hero-book"
-        className="rounded-[18px] bg-transparent text-white shadow-[0_26px_90px_rgba(3,18,44,0.34)]"
+        className="hero-booking-glass rounded-[18px] text-white shadow-[0_26px_90px_rgba(3,18,44,0.34)]"
+        surfaceClassName="hero-booking-glass-surface"
+        contentClassName="hero-booking-glass-content"
         preset="plaque"
         radius={18}
-        blur={1.5}
-        saturate={1.42}
-        scale={34}
-        bezel={14}
-        curve={2.8}
-        thickness={0.3}
-        dispersion={0.055}
-        tint={0.055}
-        border={0}
-        glow={0.08}
-        edge={0.14}
+        blur={18}
+        saturate={1.16}
+        scale={0}
+        bezel={0}
+        curve={0}
+        thickness={0}
+        dispersion={0}
+        tint={0.035}
+        border={0.08}
+        glow={0.03}
+        edge={0.1}
         light={305}
-        refract
+        refract={false}
         uniformBorder
       >
         {bookingPanel}
