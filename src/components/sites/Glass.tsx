@@ -26,6 +26,8 @@ type GlassProps = {
   uniformBorder?: boolean
   surfaceClassName?: string
   contentClassName?: string
+  standalone?: boolean
+  live?: boolean
 }
 
 export function Glass({
@@ -51,6 +53,8 @@ export function Glass({
   uniformBorder = false,
   surfaceClassName,
   contentClassName,
+  standalone = false,
+  live = false,
 }: GlassProps) {
   return (
     <div id={id} className={`glass-control relative isolate overflow-hidden ${className ?? ""}`}>
@@ -72,6 +76,8 @@ export function Glass({
         refract={refract}
         reveal={reveal}
         className={surfaceClassName}
+        standalone={standalone}
+        live={live}
       />
       {uniformBorder && <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit] border border-white/26 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" />}
       <div className={`relative z-10 ${contentClassName ?? ""}`}>{children}</div>
