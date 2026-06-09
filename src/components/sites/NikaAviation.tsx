@@ -922,6 +922,10 @@ export function NikaAviation() {
           <div>
             <Logo />
             <p className="mt-5 max-w-xs text-sm leading-6 text-white/70">Connecting you to the world with care, comfort and commitment.</p>
+            <Link href="/pilot" className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#f6a915] px-4 text-sm font-bold text-[#06255b] hover:bg-[#ffc04d]">
+              About the Pilot
+              <ArrowRight className="size-4" />
+            </Link>
           </div>
           <div>
             <h2 className="text-sm font-bold uppercase text-[#f6a915]">Travel</h2>
@@ -929,6 +933,7 @@ export function NikaAviation() {
               {navItems.slice(1, 6).map((item) => (
                 <li key={item.key}><button onClick={() => openNavItem(item.key)} className="hover:text-white">{item.label}</button></li>
               ))}
+              <li><Link href="/pilot" className="hover:text-white">About the Pilot</Link></li>
             </ul>
           </div>
           <div>
