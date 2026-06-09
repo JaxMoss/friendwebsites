@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type FormEvent, type ReactNode } from "react"
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
@@ -38,7 +38,7 @@ const AircraftScrollExperience = dynamic(
   () => import("@/components/sites/AircraftScrollExperience").then((module) => module.AircraftScrollExperience),
   {
     ssr: false,
-    loading: () => <div className="h-[100svh] bg-[#061d4f]" />,
+    loading: () => <AircraftScenePlaceholder />,
   }
 )
 
@@ -204,6 +204,69 @@ function TextInput({ placeholder, icon: Icon }: { placeholder: string; icon: Luc
       <Icon className="size-4 text-[#f6a915]" />
       <input required placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-white/48 outline-none" />
     </label>
+  )
+}
+
+function AircraftScenePlaceholder() {
+  return (
+    <section className="relative min-h-[190svh] bg-[#061d4f] text-white">
+      <div className="sticky top-0 min-h-screen overflow-hidden">
+        <div className="absolute inset-0 bg-[url('/assets/cloudscape-pixabay-8771179.jpg')] bg-cover bg-center" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,28,73,0.2)_0%,rgba(5,28,73,0.5)_42%,rgba(3,18,44,0.7)_100%)]" />
+        <div className="relative z-10 mx-auto grid min-h-screen max-w-7xl items-end px-5 pb-12 pt-24 sm:px-8 lg:grid-cols-[390px_1fr] lg:items-center lg:pb-24">
+          <article className="max-w-[390px] border-l-2 border-[#f6a915] bg-[#03122c]/42 py-5 pl-5 pr-4 backdrop-blur-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#f6a915]">ShaBest 01</p>
+            <h2 className="mt-4 text-balance text-4xl font-bold leading-[1.04] sm:text-[2.75rem]">A quieter kind of takeoff.</h2>
+            <p className="mt-5 max-w-sm text-[15px] leading-7 text-white/76">The real aircraft experience loads as this section approaches view.</p>
+          </article>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#061d4f] to-transparent" />
+      </div>
+    </section>
+  )
+}
+
+function DeferredAircraftScrollExperience() {
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [shouldMount, setShouldMount] = useState(false)
+  const [reducedMotion] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false
+  )
+
+  useEffect(() => {
+    if (shouldMount || reducedMotion) return
+    const root = rootRef.current
+    if (!root) return
+
+    const mountScene = () => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(() => setShouldMount(true), { timeout: 1200 })
+        return
+      }
+      globalThis.setTimeout(() => setShouldMount(true), 1)
+    }
+
+    if (!("IntersectionObserver" in window)) {
+      mountScene()
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return
+        observer.disconnect()
+        mountScene()
+      },
+      { rootMargin: "80px 0px" }
+    )
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [reducedMotion, shouldMount])
+
+  return (
+    <div ref={rootRef}>
+      {shouldMount && !reducedMotion ? <AircraftScrollExperience /> : <AircraftScenePlaceholder />}
+    </div>
   )
 }
 
@@ -820,7 +883,7 @@ export function NikaAviation() {
         </div>
       </section>
 
-      <AircraftScrollExperience />
+      <DeferredAircraftScrollExperience />
 
       <section id="site-app" className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
         <div className="mb-8 flex gap-2 overflow-x-auto rounded-2xl border border-[#d8e0ee] bg-white p-2 shadow-[0_18px_54px_rgba(6,29,79,0.08)]">
@@ -899,28 +962,30 @@ export function NikaAviation() {
 
       {notice && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#03122c]/78 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <Panel className="w-full max-w-lg p-6">
+          <div className="w-full max-w-lg rounded-2xl border border-white/18 bg-[#061d4f]/86 p-6 text-white shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-bold uppercase text-[#b97900]">{notice === "book" ? "Flight no longer available" : "ShaBest service notice"}</p>
-                <h2 className="mt-2 text-3xl font-bold leading-tight text-[#061d4f]">{notice === "book" ? "This fare just departed." : "This service is currently handled by Captain Nika."}</h2>
+                <p className="text-sm font-bold uppercase text-[#f6a915]">{notice === "book" ? "Flight unavailable" : "ShaBest desk"}</p>
+                <h2 className="mt-2 text-3xl font-bold leading-tight text-white">
+                  {notice === "book" ? "This ShaBest fare is no longer available." : "Captain Nika handles this one manually."}
+                </h2>
               </div>
-              <button type="button" onClick={() => setNotice(null)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100" aria-label="Close notice">
+              <button type="button" onClick={() => setNotice(null)} className="rounded-md p-2 text-white/66 hover:bg-white/10 hover:text-white" aria-label="Close notice">
                 <X className="size-5" />
               </button>
             </div>
-            <p className="mt-5 leading-7 text-slate-700">
-              ShaBest flights are no longer available for purchase today. You can still buy the pilot, Nika, a coffee or contribute to his pilot education fund.
+            <p className="mt-5 leading-7 text-white/74">
+              The route display is a training schedule, so checkout ends here. You can still buy the pilot, Nika, a coffee or contribute to his pilot education fund.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <a href={venmoUrl} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#f6a915] px-5 text-sm font-bold text-[#06255b] hover:bg-[#ffc04d]">
                 <Coffee className="size-5" />
-                Pay @Nika_Shabestari
+                Support Nika
               </a>
-              <Button onClick={() => setNotice(null)} variant="outline" className="h-12 rounded-xl border-[#06255b] text-[#06255b]">Keep Browsing</Button>
+              <Button onClick={() => setNotice(null)} variant="outline" className="h-12 rounded-xl border-white/22 bg-white/8 text-white hover:bg-white/14 hover:text-white">Keep Browsing</Button>
             </div>
-            <p className="mt-4 text-xs leading-5 text-slate-500">Venmo opens in a new tab with the note &quot;Pilot education fund.&quot; Payment is handled by Venmo.</p>
-          </Panel>
+            <p className="mt-4 text-xs leading-5 text-white/50">Venmo opens in a new tab with the note &quot;Pilot education fund.&quot; Payment is handled by Venmo.</p>
+          </div>
         </div>
       )}
     </main>

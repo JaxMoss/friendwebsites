@@ -26,33 +26,6 @@ function clamp(value: number, min = 0, max = 1) {
   return Math.min(max, Math.max(min, value))
 }
 
-function makeFallbackPlane() {
-  const group = new THREE.Group()
-  const white = new THREE.MeshStandardMaterial({ color: "#f6f1e8", metalness: 0.1, roughness: 0.35 })
-  const navy = new THREE.MeshStandardMaterial({ color: "#092b63", metalness: 0.2, roughness: 0.38 })
-
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 3.4, 10, 24), white)
-  body.rotation.z = Math.PI / 2
-  group.add(body)
-
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.15), navy)
-  wing.position.set(-0.2, -0.05, 0)
-  group.add(wing)
-
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.9, 0.55), navy)
-  tail.position.set(-1.75, 0.42, 0)
-  tail.rotation.z = -0.18
-  group.add(tail)
-
-  const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.45, 24), navy)
-  engine.rotation.z = Math.PI / 2
-  engine.position.set(0.25, -0.38, 0.55)
-  group.add(engine)
-
-  group.rotation.set(0.05, -0.18, -0.02)
-  return group
-}
-
 export function AircraftScrollExperience() {
   const rootRef = useRef<HTMLElement | null>(null)
   const mountRef = useRef<HTMLDivElement | null>(null)
@@ -70,9 +43,13 @@ export function AircraftScrollExperience() {
     camera.position.set(0, 0.55, 12)
     camera.lookAt(0, 0, 0)
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" })
+    const renderer = new THREE.WebGLRenderer({
+      antialias: window.devicePixelRatio <= 1.25,
+      alpha: true,
+      powerPreference: "high-performance",
+    })
     renderer.setClearColor(0x000000, 0)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.1))
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.domElement.dataset.aviationScene = "true"
     renderer.domElement.dataset.model = "loading"
@@ -91,9 +68,8 @@ export function AircraftScrollExperience() {
     scene.add(rim)
 
     const aircraft = new THREE.Group()
-    const fallback = makeFallbackPlane()
-    aircraft.add(fallback)
     scene.add(aircraft)
+    let modelReady = false
 
     const loader = new GLTFLoader()
     loader.load(
@@ -117,13 +93,13 @@ export function AircraftScrollExperience() {
           mesh.receiveShadow = true
         })
 
-        fallback.visible = false
         aircraft.add(normalizedModel)
+        modelReady = true
         renderer.domElement.dataset.model = "pixabay-passenger-plane"
       },
       undefined,
       () => {
-        renderer.domElement.dataset.model = "procedural-fallback"
+        renderer.domElement.dataset.model = "unavailable"
       }
     )
 
@@ -170,7 +146,7 @@ export function AircraftScrollExperience() {
 
     const animate = () => {
       frame = requestAnimationFrame(animate)
-      if (!isVisible || document.hidden) return
+      if (!isVisible || document.hidden || !modelReady) return
 
       const p = clamp(scrollProgress)
       const startX = viewWidth * -0.1
@@ -195,7 +171,7 @@ export function AircraftScrollExperience() {
     resizeObserver.observe(mount)
     intersectionObserver.observe(root)
     window.addEventListener("scroll", updateProgress, { passive: true })
-    window.addEventListener("pointermove", onPointerMove, { passive: true })
+    root.addEventListener("pointermove", onPointerMove, { passive: true })
 
     resize()
     updateProgress()
@@ -206,7 +182,7 @@ export function AircraftScrollExperience() {
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
       window.removeEventListener("scroll", updateProgress)
-      window.removeEventListener("pointermove", onPointerMove)
+      root.removeEventListener("pointermove", onPointerMove)
       scene.traverse((object) => {
         const mesh = object as THREE.Mesh
         if (mesh.geometry) mesh.geometry.dispose()
@@ -226,7 +202,7 @@ export function AircraftScrollExperience() {
     <section
       ref={rootRef}
       data-aircraft-scroll-section="true"
-      className="relative min-h-[225svh] bg-[#061d4f] text-white"
+      className="relative min-h-[190svh] bg-[#061d4f] text-white"
     >
       <div className="sticky top-0 min-h-screen overflow-hidden">
         <div className="absolute inset-0 bg-[url('/assets/cloudscape-pixabay-8771179.jpg')] bg-cover bg-center" />
