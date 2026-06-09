@@ -36,27 +36,27 @@ export function NikaFlightTrackerPage() {
           </div>
         </header>
 
-        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-8 pt-5 sm:px-8 lg:pt-6">
-          <div className="grid gap-4 lg:grid-cols-[1fr_380px] lg:items-end">
+        <div className="relative z-10 mx-auto max-w-[1500px] px-5 pb-8 pt-5 sm:px-8 lg:pt-6">
+          <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-end">
             <div>
-              <p className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#f6b21a]">
+              <p className="tracker-glass inline-flex items-center gap-2 rounded-full px-4 py-2 text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#f6b21a]">
                 <Radar className="size-4" />
                 Live public aircraft map
               </p>
               <h1 className="mt-3 max-w-4xl text-balance text-4xl font-bold leading-[1.04] tracking-normal lg:text-5xl">
                 ShaBest live flight tracker.
               </h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-white/72">
-                Live public ADS-B positions are displayed as ShaBest operations with aircraft figures, country landmasses and projected heading trails.
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/66">
+                Drag the globe, inspect live ADS-B aircraft positions, and follow short heading vectors from current state data.
               </p>
             </div>
-            <div className="rounded-2xl border border-white/12 bg-white/8 p-4 shadow-2xl shadow-black/18 backdrop-blur-xl">
+            <div className="tracker-glass rounded-2xl p-4">
               <div className="flex items-center gap-3">
                 <ShieldCheck className="size-6 text-[#f6b21a]" />
                 <h2 className="text-lg font-bold">Data note</h2>
               </div>
-              <p className="mt-2 text-sm leading-6 text-white/66">
-                OpenSky provides live state vectors, not full itinerary routes. The gold trails are heading projections from live position and heading data where available.
+              <p className="mt-2 text-xs leading-5 text-white/62">
+                Public feeds provide aircraft state, not guaranteed airline itineraries. Tracks are short vector projections, not claimed filed routes.
               </p>
             </div>
           </div>

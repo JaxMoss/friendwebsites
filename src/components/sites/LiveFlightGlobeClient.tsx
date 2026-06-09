@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import ThreeGlobe from "three-globe"
 import { feature } from "topojson-client"
 import countries110m from "world-atlas/countries-110m.json"
@@ -36,13 +37,28 @@ type CountryFeature = {
   properties?: Record<string, unknown>
 }
 
-type TrackArc = {
+type TrackPoint = {
+  lat: number
+  lng: number
+  alt: number
+}
+
+type TrackPath = {
   id: string
-  startLat: number
-  startLng: number
-  endLat: number
-  endLng: number
-  altitude: number
+  points: TrackPoint[]
+  color: string[]
+}
+
+function trackPointFromFlight(flight: LiveFlight): TrackPoint {
+  return {
+    lat: flight.latitude,
+    lng: flight.longitude,
+    alt: altitudeToGlobeAltitude(flight.altitude),
+  }
+}
+
+function sameTrackPoint(a: TrackPoint, b: TrackPoint) {
+  return Math.abs(a.lat - b.lat) < 0.006 && Math.abs(a.lng - b.lng) < 0.006
 }
 
 const countryFeatures = (
@@ -82,64 +98,97 @@ function flightAlias(flight: LiveFlight) {
   return `SB ${digits || flight.id.slice(-3).toUpperCase()}`
 }
 
-function makeTrackArc(flight: LiveFlight): TrackArc {
-  const start = projectPoint(flight.latitude, flight.longitude, flight.heading + 180, 1.2)
-  const end = projectPoint(flight.latitude, flight.longitude, flight.heading, 3.8)
+function makeTrackPath(flight: LiveFlight): TrackPath {
+  const altitude = altitudeToGlobeAltitude(flight.altitude)
+  const speedFactor = Math.min(Math.max(flight.velocity || 180, 120) / 260, 1.25)
+  const behindFar = projectPoint(flight.latitude, flight.longitude, flight.heading + 180, 1.9 * speedFactor)
+  const behindNear = projectPoint(flight.latitude, flight.longitude, flight.heading + 180, 0.72 * speedFactor)
+  const ahead = projectPoint(flight.latitude, flight.longitude, flight.heading, 0.38 * speedFactor)
 
   return {
     id: flight.id,
-    startLat: start.latitude,
-    startLng: start.longitude,
-    endLat: end.latitude,
-    endLng: end.longitude,
-    altitude: altitudeToGlobeAltitude(flight.altitude),
+    color: ["rgba(246, 178, 26, 0.04)", "rgba(246, 178, 26, 0.58)", "rgba(255, 255, 255, 0.28)"],
+    points: [
+      { lat: behindFar.latitude, lng: behindFar.longitude, alt: altitude * 0.92 },
+      { lat: behindNear.latitude, lng: behindNear.longitude, alt: altitude * 0.98 },
+      { lat: flight.latitude, lng: flight.longitude, alt: altitude },
+      { lat: ahead.latitude, lng: ahead.longitude, alt: altitude * 1.02 },
+    ],
   }
 }
 
-function makeAircraftObject() {
-  const group = new THREE.Group()
+function makeObservedTrackPath(flight: LiveFlight, observedPoints?: TrackPoint[]): TrackPath {
+  if (observedPoints && observedPoints.length > 1) {
+    return {
+      id: flight.id,
+      color: ["rgba(246, 178, 26, 0.06)", "rgba(246, 178, 26, 0.62)", "rgba(255, 255, 255, 0.34)"],
+      points: observedPoints,
+    }
+  }
 
-  const body = new THREE.Mesh(aircraftBodyGeometry, aircraftWhiteMaterial)
-  body.rotation.x = Math.PI / 2
-  group.add(body)
-
-  const wing = new THREE.Mesh(aircraftWingGeometry, aircraftGoldMaterial)
-  wing.position.z = -0.008
-  group.add(wing)
-
-  const tail = new THREE.Mesh(aircraftTailGeometry, aircraftGoldMaterial)
-  tail.position.z = -0.042
-  tail.rotation.y = 0.42
-  group.add(tail)
-
-  group.scale.setScalar(1.8)
-  return group
+  return makeTrackPath(flight)
 }
 
-const aircraftBodyGeometry = new THREE.ConeGeometry(0.018, 0.096, 4)
-const aircraftWingGeometry = new THREE.BoxGeometry(0.086, 0.008, 0.014)
-const aircraftTailGeometry = new THREE.BoxGeometry(0.044, 0.007, 0.012)
-const aircraftGoldMaterial = new THREE.MeshStandardMaterial({
-  color: "#f6b21a",
-  emissive: "#c67800",
-  emissiveIntensity: 0.32,
-  metalness: 0.35,
-  roughness: 0.28,
-})
-const aircraftWhiteMaterial = new THREE.MeshStandardMaterial({
-  color: "#f8fbff",
-  emissive: "#8dbdff",
-  emissiveIntensity: 0.12,
-  metalness: 0.18,
-  roughness: 0.34,
-})
-const sharedAircraftResources = new Set<THREE.BufferGeometry | THREE.Material>([
-  aircraftBodyGeometry,
-  aircraftWingGeometry,
-  aircraftTailGeometry,
-  aircraftGoldMaterial,
-  aircraftWhiteMaterial,
-])
+let aircraftTexture: THREE.CanvasTexture | null = null
+
+function getAircraftTexture() {
+  if (aircraftTexture || typeof document === "undefined") return aircraftTexture
+
+  const canvas = document.createElement("canvas")
+  canvas.width = 96
+  canvas.height = 96
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return null
+
+  ctx.translate(48, 48)
+  ctx.rotate(-Math.PI / 4)
+  ctx.fillStyle = "#f6b21a"
+  ctx.strokeStyle = "rgba(3, 18, 44, 0.92)"
+  ctx.lineWidth = 4
+  ctx.lineJoin = "round"
+  ctx.beginPath()
+  ctx.moveTo(0, -35)
+  ctx.lineTo(9, -8)
+  ctx.lineTo(36, 3)
+  ctx.lineTo(36, 12)
+  ctx.lineTo(7, 6)
+  ctx.lineTo(7, 23)
+  ctx.lineTo(17, 31)
+  ctx.lineTo(17, 38)
+  ctx.lineTo(0, 30)
+  ctx.lineTo(-17, 38)
+  ctx.lineTo(-17, 31)
+  ctx.lineTo(-7, 23)
+  ctx.lineTo(-7, 6)
+  ctx.lineTo(-36, 12)
+  ctx.lineTo(-36, 3)
+  ctx.lineTo(-9, -8)
+  ctx.closePath()
+  ctx.stroke()
+  ctx.fill()
+
+  aircraftTexture = new THREE.CanvasTexture(canvas)
+  aircraftTexture.colorSpace = THREE.SRGBColorSpace
+  aircraftTexture.needsUpdate = true
+  return aircraftTexture
+}
+
+function makeAircraftSprite(flight: LiveFlight) {
+  const texture = getAircraftTexture()
+  const material = new THREE.SpriteMaterial({
+    map: texture ?? undefined,
+    color: texture ? "#ffffff" : "#f6b21a",
+    transparent: true,
+    opacity: 0.96,
+    depthWrite: false,
+    depthTest: true,
+    sizeAttenuation: false,
+    rotation: THREE.MathUtils.degToRad(-(flight.heading || 0)),
+  })
+  const sprite = new THREE.Sprite(material)
+  sprite.scale.set(0.028, 0.028, 1)
+  return sprite
+}
 
 function MetricSkeleton() {
   return (
@@ -172,21 +221,43 @@ export function LiveFlightGlobe() {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const globeRef = useRef<ThreeGlobe | null>(null)
   const [flights, setFlights] = useState<LiveFlight[]>([])
+  const [trackHistories, setTrackHistories] = useState<Record<string, TrackPoint[]>>({})
   const [sourceLabel, setSourceLabel] = useState("Loading public aircraft positions.")
   const [updatedAt, setUpdatedAt] = useState("")
   const [isLoading, setIsLoading] = useState(true)
 
   const isInitialLoading = isLoading && flights.length === 0
-  const visibleFlights = useMemo(() => flights.slice(0, 240), [flights])
-  const trackArcs = useMemo(() => visibleFlights.slice(0, 90).map(makeTrackArc), [visibleFlights])
+  const visibleFlights = useMemo(() => flights.slice(0, 420), [flights])
+  const trackPaths = useMemo(
+    () => visibleFlights.slice(0, 90).map((flight) => makeObservedTrackPath(flight, trackHistories[flight.id])),
+    [trackHistories, visibleFlights]
+  )
   const featuredFlights = flights.slice(0, 10)
 
-  async function loadFlights() {
+  const updateObservedTracks = useCallback((nextFlights: LiveFlight[]) => {
+    setTrackHistories((currentHistories) => {
+      const nextHistories: Record<string, TrackPoint[]> = {}
+
+      nextFlights.slice(0, 520).forEach((flight) => {
+        const nextPoint = trackPointFromFlight(flight)
+        const current = currentHistories[flight.id] ?? []
+        const lastPoint = current[current.length - 1]
+        nextHistories[flight.id] = !lastPoint || !sameTrackPoint(lastPoint, nextPoint)
+          ? [...current, nextPoint].slice(-16)
+          : current
+      })
+
+      return nextHistories
+    })
+  }, [])
+
+  const loadFlights = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch("/api/shabest/live-flights")
       const data = (await response.json()) as LiveFlightResponse
       setFlights(data.flights)
+      updateObservedTracks(data.flights)
       setSourceLabel(data.sourceLabel)
       setUpdatedAt(data.updatedAt)
     } catch {
@@ -194,7 +265,7 @@ export function LiveFlightGlobe() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [updateObservedTracks])
 
   useEffect(() => {
     const initialLoad = window.setTimeout(loadFlights, 0)
@@ -203,17 +274,17 @@ export function LiveFlightGlobe() {
       window.clearTimeout(initialLoad)
       window.clearInterval(interval)
     }
-  }, [])
+  }, [loadFlights])
 
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.FogExp2("#020917", 0.0018)
+    scene.fog = new THREE.FogExp2("#020917", 0.00135)
 
-    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1000)
-    camera.position.set(0, 0.32, 355)
+    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 1000)
+    camera.position.set(0, 0.1, 305)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2))
@@ -222,49 +293,77 @@ export function LiveFlightGlobe() {
 
     const globe = new ThreeGlobe({ animateIn: true })
       .showAtmosphere(true)
-      .atmosphereColor("#75cfff")
-      .atmosphereAltitude(0.19)
+      .atmosphereColor("#6ec8ff")
+      .atmosphereAltitude(0.14)
       .globeMaterial(
-        new THREE.MeshStandardMaterial({
-          color: "#0b3f78",
-          emissive: "#0a3470",
-          emissiveIntensity: 0.72,
-          metalness: 0.02,
-          roughness: 0.7,
+        new THREE.MeshBasicMaterial({
+          color: "#0a315f",
         })
       )
       .polygonsData(countryFeatures)
       .polygonGeoJsonGeometry((country) => (country as CountryFeature).geometry)
-      .polygonAltitude(() => 0.012)
-      .polygonCapColor(() => "rgba(74, 188, 156, 0.86)")
-      .polygonSideColor(() => "rgba(25, 84, 110, 0.62)")
-      .polygonStrokeColor(() => "rgba(224, 249, 255, 0.64)")
+      .polygonAltitude(() => 0.009)
+      .polygonCapColor(() => "rgba(77, 155, 134, 0.78)")
+      .polygonSideColor(() => "rgba(18, 62, 92, 0.62)")
+      .polygonStrokeColor(() => "rgba(218, 242, 255, 0.36)")
       .polygonsTransitionDuration(600)
       .arcsData([])
-      .arcStartLat("startLat")
-      .arcStartLng("startLng")
-      .arcEndLat("endLat")
-      .arcEndLng("endLng")
-      .arcAltitude((arc) => (arc as TrackArc).altitude)
-      .arcColor(() => ["rgba(246, 178, 26, 0)", "rgba(246, 178, 26, 0.95)", "rgba(126, 207, 255, 0.5)"])
-      .arcStroke(() => 0.42)
-      .arcDashLength(() => 0.22)
-      .arcDashGap(() => 0.78)
-      .arcDashInitialGap(() => Math.random())
-      .arcDashAnimateTime(() => 2600)
       .arcsTransitionDuration(700)
+      .pathsData([])
+      .pathPoints("points")
+      .pathPointLat("lat")
+      .pathPointLng("lng")
+      .pathPointAlt("alt")
+      .pathColor((path: object) => (path as TrackPath).color)
+      .pathStroke(() => 0.2)
+      .pathDashLength(() => 1)
+      .pathDashGap(() => 0)
+      .pathDashInitialGap(() => 0)
+      .pathDashAnimateTime(() => 0)
+      .pathTransitionDuration(900)
+      .pointsData([])
+      .pointLat("latitude")
+      .pointLng("longitude")
+      .pointAltitude((flight) => altitudeToGlobeAltitude((flight as LiveFlight).altitude) * 0.96)
+      .pointRadius(() => 0.105)
+      .pointResolution(8)
+      .pointColor(() => "rgba(246, 178, 26, 0.92)")
+      .pointsTransitionDuration(900)
       .objectsData([])
       .objectLat("latitude")
       .objectLng("longitude")
       .objectAltitude((flight) => altitudeToGlobeAltitude((flight as LiveFlight).altitude))
-      .objectFacesSurface(true)
-      .objectRotation((flight) => ({ z: THREE.MathUtils.degToRad((flight as LiveFlight).heading - 90) }))
-      .objectThreeObject(() => makeAircraftObject())
+      .objectFacesSurface(false)
+      .objectThreeObject((flight) => makeAircraftSprite(flight as LiveFlight))
 
     globe.rotation.y = 0.08
     globe.rotation.x = -0.18
     scene.add(globe)
     globeRef.current = globe
+
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enableDamping = true
+    controls.dampingFactor = 0.07
+    controls.enablePan = false
+    controls.minDistance = 165
+    controls.maxDistance = 470
+    controls.rotateSpeed = 0.64
+    controls.zoomSpeed = 0.62
+    controls.autoRotate = true
+    controls.autoRotateSpeed = 0.28
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_ROTATE,
+    }
+    renderer.domElement.style.cursor = "grab"
+    renderer.domElement.style.touchAction = "none"
+    controls.addEventListener("start", () => {
+      controls.autoRotate = false
+      renderer.domElement.style.cursor = "grabbing"
+    })
+    controls.addEventListener("end", () => {
+      renderer.domElement.style.cursor = "grab"
+    })
 
     const starsGeometry = new THREE.BufferGeometry()
     const starPositions = new Float32Array(360)
@@ -280,11 +379,11 @@ export function LiveFlightGlobe() {
     )
     scene.add(stars)
 
-    scene.add(new THREE.AmbientLight("#9fdcff", 1.35))
-    const key = new THREE.DirectionalLight("#fff2cb", 3.8)
+    scene.add(new THREE.AmbientLight("#9fdcff", 1.12))
+    const key = new THREE.DirectionalLight("#fff2cb", 2.8)
     key.position.set(220, 120, 260)
     scene.add(key)
-    const rim = new THREE.DirectionalLight("#4bb8ff", 2.2)
+    const rim = new THREE.DirectionalLight("#4bb8ff", 1.8)
     rim.position.set(-220, -80, 180)
     scene.add(rim)
 
@@ -302,7 +401,7 @@ export function LiveFlightGlobe() {
     const animate = () => {
       frame = requestAnimationFrame(animate)
       if (!isVisible || document.hidden) return
-      globe.rotation.y += 0.00115
+      controls.update()
       stars.rotation.y -= 0.00026
       renderer.render(scene, camera)
     }
@@ -320,15 +419,14 @@ export function LiveFlightGlobe() {
       cancelAnimationFrame(frame)
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
+      controls.dispose()
       globe._destructor()
       scene.traverse((object) => {
         const mesh = object as THREE.Mesh
-        if (mesh.geometry && !sharedAircraftResources.has(mesh.geometry)) mesh.geometry.dispose()
+        mesh.geometry?.dispose()
         const material = mesh.material
-        if (Array.isArray(material)) material.forEach((item) => {
-          if (!sharedAircraftResources.has(item)) item.dispose()
-        })
-        else if (material && !sharedAircraftResources.has(material)) material.dispose()
+        if (Array.isArray(material)) material.forEach((item) => item.dispose())
+        else material?.dispose()
       })
       renderer.dispose()
       renderer.domElement.remove()
@@ -341,21 +439,22 @@ export function LiveFlightGlobe() {
     if (!globe) return
 
     globe.objectsData(visibleFlights as unknown as object[])
-    globe.arcsData(trackArcs as unknown as object[])
-  }, [trackArcs, visibleFlights])
+    globe.pointsData(visibleFlights as unknown as object[])
+    globe.pathsData(trackPaths as unknown as object[])
+  }, [trackPaths, visibleFlights])
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/12 bg-[#03122c] text-white shadow-2xl shadow-slate-950/30">
-      <div className="grid min-h-[760px] xl:grid-cols-[minmax(0,1.45fr)_420px]">
+    <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#020917] text-white shadow-2xl shadow-slate-950/30">
+      <div className="grid min-h-[780px] xl:grid-cols-[minmax(0,1.52fr)_390px]">
         <div className="relative min-h-[560px] overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_38%_34%,rgba(50,154,221,0.34),transparent_36%),radial-gradient(circle_at_76%_62%,rgba(246,178,26,0.16),transparent_30%),linear-gradient(140deg,#061d4f,#020917_62%,#03122c)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_38%_34%,rgba(50,154,221,0.2),transparent_34%),radial-gradient(circle_at_76%_66%,rgba(246,178,26,0.08),transparent_28%),linear-gradient(140deg,#071f4b,#020917_64%,#03122c)]" />
           <div ref={mountRef} className="absolute inset-0" aria-hidden="true" />
 
           <div className="pointer-events-none absolute inset-x-5 top-5 flex flex-wrap items-start justify-between gap-4">
-            <div className="rounded-2xl border border-white/12 bg-[#03122c]/66 p-4 shadow-xl shadow-black/18 backdrop-blur-xl">
+            <div className="tracker-glass rounded-2xl p-4">
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#f6b21a]">
                 <Globe2 className="size-4" />
-                ShaBest live ops
+                Live aircraft layer
               </p>
               {isInitialLoading ? (
                 <div className="mt-3 animate-pulse">
@@ -365,13 +464,15 @@ export function LiveFlightGlobe() {
               ) : (
                 <>
                   <h3 className="mt-2 text-4xl font-bold">{flights.length.toLocaleString()} aircraft</h3>
-                  <p className="mt-1 text-sm text-white/64">Public ADS-B aircraft presented as ShaBest operations.</p>
+                  <p className="mt-1 text-sm text-white/64">
+                    Showing {visibleFlights.length.toLocaleString()} planes and {trackPaths.length.toLocaleString()} live/observed tracks.
+                  </p>
                 </>
               )}
             </div>
 
             {isInitialLoading && (
-              <div className="rounded-2xl border border-white/12 bg-[#03122c]/58 px-4 py-3 text-sm font-semibold text-white/72 shadow-xl shadow-black/18 backdrop-blur-xl">
+              <div className="tracker-glass rounded-2xl px-4 py-3 text-sm font-semibold text-white/72">
                 Loading globe, countries and live positions...
               </div>
             )}
@@ -380,11 +481,11 @@ export function LiveFlightGlobe() {
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#03122c] via-[#03122c]/44 to-transparent" />
         </div>
 
-        <aside className="border-t border-white/10 bg-[#03122c]/88 p-5 xl:border-l xl:border-t-0">
+        <aside className="border-t border-white/10 bg-[#03122c]/72 p-5 backdrop-blur-xl xl:border-l xl:border-t-0">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#f6b21a]">Operations board</p>
-              <h2 className="mt-2 text-3xl font-bold">Flights happening now</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f6b21a]">Operations board</p>
+              <h2 className="mt-2 text-2xl font-bold">Flights happening now</h2>
             </div>
             <Button onClick={loadFlights} disabled={isLoading} className="h-10 rounded-xl bg-[#f6b21a] px-4 text-[#06255b] hover:bg-[#ffc451] disabled:opacity-70">
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -401,17 +502,17 @@ export function LiveFlightGlobe() {
               </>
             ) : (
               <>
-                <div className="rounded-xl border border-white/10 bg-white/8 p-4">
+                <div className="tracker-glass rounded-xl p-4">
                   <Satellite className="size-5 text-[#f6b21a]" />
                   <p className="mt-3 text-2xl font-bold">{flights.filter((flight) => flight.altitude > 10000).length.toLocaleString()}</p>
                   <p className="text-xs text-white/58">Cruising</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/8 p-4">
+                <div className="tracker-glass rounded-xl p-4">
                   <Activity className="size-5 text-[#f6b21a]" />
                   <p className="mt-3 text-2xl font-bold">{flights.filter((flight) => Math.abs(flight.verticalRate) > 2).length.toLocaleString()}</p>
                   <p className="text-xs text-white/58">Changing level</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/8 p-4">
+                <div className="tracker-glass rounded-xl p-4">
                   <Route className="size-5 text-[#f6b21a]" />
                   <p className="mt-3 text-2xl font-bold">{new Set(flights.map((flight) => flight.country)).size.toLocaleString()}</p>
                   <p className="text-xs text-white/58">Countries</p>
@@ -423,7 +524,7 @@ export function LiveFlightGlobe() {
           <p className="mt-5 text-xs leading-5 text-white/56">
             {sourceLabel}
             {updatedAt ? ` Updated ${new Date(updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.` : ""}
-            {" "}Trails are heading projections from public state data.
+            {" "}Drag or touch the globe to rotate it. Tracks use observed positions while this page is open, then fall back to short heading vectors.
           </p>
 
           <div className="mt-5 max-h-[430px] overflow-y-auto pr-1">
@@ -434,7 +535,7 @@ export function LiveFlightGlobe() {
             ) : (
               <div className="space-y-3">
                 {featuredFlights.map((flight) => (
-                  <article key={flight.id} className="rounded-xl border border-white/10 bg-white/7 p-4 shadow-lg shadow-black/8">
+                  <article key={flight.id} className="tracker-glass rounded-xl p-4">
                     <div className="flex items-center justify-between gap-3">
                       <strong className="inline-flex items-center gap-2 text-[#f6b21a]">
                         <Plane className="size-4 rotate-45" />
