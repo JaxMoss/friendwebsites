@@ -11,12 +11,14 @@ const siteMetadata = {
     description: "A cinematic ShaBest Airways landing page for Nikasha Bestari.",
     domain: "nikashabestari.com",
     image: "/assets/nika-aircraft-hero.png?v=shabest-20260608",
+    icon: "/favicons/shabest.svg",
   },
   cameron: {
     title: "Cameron Morken | Personal Social",
     description: "Cameron Morken's personal social page.",
     domain: "cameronmorken.com",
     image: "/assets/cameron-avatar.svg?v=cameron-20260608",
+    icon: "/favicons/cameron.svg",
   },
 } as const
 
@@ -37,6 +39,11 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(canonical),
     alternates: {
       canonical,
+    },
+    icons: {
+      icon: [{ url: meta.icon, type: "image/svg+xml" }],
+      shortcut: [meta.icon],
+      apple: [meta.icon],
     },
     openGraph: {
       title: meta.title,
